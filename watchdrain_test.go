@@ -1,4 +1,4 @@
-package watchdrain
+package main
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	testDir = "test-Dir"
+	testDir = "test-dir"
 	sub     = "test-sub"
 	file1   = "temp1.txt"
 	file2   = "temp2.txt"
@@ -96,7 +96,7 @@ func TestReadDirFiles(t *testing.T) {
 		createTempFile(t)
 	}
 
-	d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(filepath.Join(os.TempDir(), testDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestReadDirFiles(t *testing.T) {
 func TestEmpty(t *testing.T) {
 	createPath(t)
 
-	d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(filepath.Join(os.TempDir(), testDir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,12 +140,12 @@ func TestTimer(t *testing.T) {
 	createSeedFiles(t)
 
 	want := ErrTimerEnded
-	d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(filepath.Join(os.TempDir(), testDir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts := NewOptions((50 * time.Millisecond), 0, false)
-	if _, got := d.WatchDrain(opts); got != nil {
+	opts := newOptions((50 * time.Millisecond), 0, false)
+	if _, got := d.watchDrain(opts); got != nil {
 		if !errors.Is(got, want) {
 			t.Errorf("Unexpected result. Wanted: %s, got: %s", want, got)
 		}
@@ -165,12 +165,12 @@ func TestDrainNoCreates(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
-		d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(filepath.Join(os.TempDir(), testDir))
 		if err != nil {
 			t.Fatal(err)
 		}
-		opts := NewOptions(0, 0, false)
-		got, err := d.WatchDrain(opts)
+		opts := newOptions(0, 0, false)
+		got, err := d.watchDrain(opts)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -207,12 +207,12 @@ func TestDrainWithCreates(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
-		d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(filepath.Join(os.TempDir(), testDir))
 		if err != nil {
 			t.Fatal(err)
 		}
-		opts := NewOptions((1 * time.Minute), math.MaxUint32, true)
-		got, err := d.WatchDrain(opts)
+		opts := newOptions((1 * time.Minute), math.MaxUint32, true)
+		got, err := d.watchDrain(opts)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,12 +263,12 @@ func TestNotDraining(t *testing.T) {
 		t.Parallel()
 
 		want := ErrThresholdExceeded
-		d, err := NewDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(filepath.Join(os.TempDir(), testDir))
 		if err != nil {
 			t.Fatal(err)
 		}
-		opts := NewOptions((1 * time.Minute), 1, true)
-		if _, got := d.WatchDrain(opts); got != nil {
+		opts := newOptions((1 * time.Minute), 1, true)
+		if _, got := d.watchDrain(opts); got != nil {
 			if !errors.Is(got, want) {
 				t.Errorf("Unexpected result. Wanted: %s, got: %s", want, got)
 			}

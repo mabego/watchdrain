@@ -15,7 +15,7 @@ cd watchdrain
 ```
 
 ```shell
-go run ./cmd/watchdrain/main.go <dir>
+go run . <dir>
 ```
 
 ### Building a binary
@@ -30,7 +30,7 @@ cd watchdrain
 ```
 
 ```shell
-sudo go build -o /usr/local/bin/watchdrain ./cmd/watchdrain/
+go install
 ```
 
 ```shell
