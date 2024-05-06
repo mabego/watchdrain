@@ -25,11 +25,11 @@ func newDir(dirName string) (*dir, error) {
 	if err != nil {
 		return nil, err
 	}
-	dir := &dir{
+	d := &dir{
 		dirName: &dirName,
 		files:   files,
 	}
-	return dir, nil
+	return d, nil
 }
 
 // readDirFiles reads a directory and returns a file count, ignoring subdirectories
@@ -97,8 +97,8 @@ func newOptions(timer time.Duration, threshold uint, verbose bool) *options {
 
 // result provides return values for watchDrain
 type result struct {
-	drained bool
 	err     error
+	drained bool
 }
 
 // watchDrain watches a directory until it is empty of files or a timer ends or a threshold is exceeded
@@ -150,13 +150,13 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 	}()
 	for !d.isEmpty() {
 		select {
-		case event, ok := <-watcher.Events:
+		case fileEvent, ok := <-watcher.Events:
 			if !ok {
 				return
 			}
-			if event.Op&fsnotify.Remove == fsnotify.Remove {
+			if fileEvent.Op&fsnotify.Remove == fsnotify.Remove {
 				if opt.verbose {
-					log.Printf("%s EVENT: %s\n", event.Op, event.Name)
+					log.Printf("%s EVENT: %s\n", fileEvent.Op, fileEvent.Name)
 				}
 				d.mu.Lock()
 				*d.files--
@@ -165,9 +165,9 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 					opt.eventCh <- Remove
 				}
 			}
-			if event.Op&fsnotify.Create == fsnotify.Create {
+			if fileEvent.Op&fsnotify.Create == fsnotify.Create {
 				if opt.verbose {
-					log.Printf("%s EVENT: %s\n", event.Op, event.Name)
+					log.Printf("%s EVENT: %s\n", fileEvent.Op, fileEvent.Name)
 				}
 				d.mu.Lock()
 				*d.files++
@@ -188,11 +188,11 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 }
 
 func timer(ctx, draining context.Context, resultCh chan<- result, opt *options) {
-	timer, cancelTimer := context.WithTimeout(ctx, opt.timer)
+	timerCtx, cancelTimer := context.WithTimeout(ctx, opt.timer)
 	defer cancelTimer()
 
 	select {
-	case <-timer.Done():
+	case <-timerCtx.Done():
 		resultCh <- result{err: ErrTimerEnded}
 		<-draining.Done()
 	case <-draining.Done():
@@ -206,14 +206,14 @@ func threshold(draining context.Context, resultCh chan<- result, opt *options) {
 	// `creates` and `removes` track draining activity
 	creates, removes := 0, 0
 	for {
-		if event, ok := <-opt.eventCh; true {
+		if fileEvent, ok := <-opt.eventCh; true {
 			if !ok {
 				return
 			}
 			switch {
-			case event == Remove:
+			case fileEvent == Remove:
 				removes++
-			case event == Create:
+			case fileEvent == Create:
 				creates++
 			}
 		}
