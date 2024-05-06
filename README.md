@@ -2,9 +2,13 @@
 
 I wrote it as an exercise to experiment with Go channels, goroutines, and testing in Go.
 
-## How to Install
+## Installation
 
-### Using `go run`
+```shell
+go install github.com/mabego/watchdrain@latest
+```
+
+## Using `go run`
 
 ```shell
 git clone https://github.com/mabego/watchdrain.git
@@ -15,41 +19,13 @@ cd watchdrain
 ```
 
 ```shell
-go run . <dir>
+go run . <directory>
 ```
 
-### Building a binary
-
+## Usage
 
 ```shell
-git clone https://github.com/mabego/watchdrain.git
+watchdrain <directory>
 ```
 
-```shell
-cd watchdrain
-```
-
-```shell
-go install
-```
-
-```shell
-watchdrain <dir>
-```
-
-### CLI Options
-
-```shell
-watchdrain -h
-watchdrain watches a directory until it is empty of files
-Usage of watchdrain:
-watchdrain <dir>
-  -threshold uint
-        Stop watching a directory if file create events exceed remove events by a threshold
-        threshold = create events - remove events
-        The lowest threshold is 1. Increase to allow more create events while watching.
-  -timer duration
-        Set a timer. Default is 5 minutes. (default 5m0s)
-  -v    Log file create and remove events
-watchdrain -timer 1m -threshold 1 -v <dir>
-```
+See `watchdrain --help` for more information.
