@@ -30,7 +30,7 @@ cd watchdrain
 ```
 
 ```shell
-go build -o /usr/local/bin/watchdrain .
+go install
 ```
 
 ```shell
