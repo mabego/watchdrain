@@ -1,4 +1,4 @@
-package watchdrain
+package main
 
 import (
 	"context"
@@ -12,20 +12,20 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// Dir represents a directory to watch drain of files
-type Dir struct {
+// dir represents a directory to watch drain of files
+type dir struct {
 	mu      sync.RWMutex // mu guards files
 	dirName *string
 	files   *uint32
 }
 
-// NewDir returns a new Dir to watch drain
-func NewDir(dirName string) (*Dir, error) {
+// newDir returns a new dir to watch drain
+func newDir(dirName string) (*dir, error) {
 	files, err := readDirFiles(dirName)
 	if err != nil {
 		return nil, err
 	}
-	dir := &Dir{
+	dir := &dir{
 		dirName: &dirName,
 		files:   files,
 	}
@@ -52,7 +52,7 @@ func readDirFiles(dirName string) (*uint32, error) {
 	return &f, nil
 }
 
-func (d *Dir) isEmpty() bool {
+func (d *dir) isEmpty() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	f := *d.files
@@ -74,17 +74,17 @@ const (
 	Remove
 )
 
-// Options for WatchDrain
-type Options struct {
+// options for watchDrain
+type options struct {
 	eventCh   chan event
 	timer     time.Duration
 	threshold uint
 	verbose   bool
 }
 
-// NewOptions returns Options, including an eventCh channel if a threshold is set
-func NewOptions(timer time.Duration, threshold uint, verbose bool) *Options {
-	opts := &Options{
+// newOptions returns options, including an eventCh channel if a threshold is set
+func newOptions(timer time.Duration, threshold uint, verbose bool) *options {
+	opts := &options{
 		timer:     timer,
 		threshold: threshold,
 		verbose:   verbose,
@@ -95,14 +95,14 @@ func NewOptions(timer time.Duration, threshold uint, verbose bool) *Options {
 	return opts
 }
 
-// result provides return values for WatchDrain
+// result provides return values for watchDrain
 type result struct {
 	drained bool
 	err     error
 }
 
-// WatchDrain watches a directory until it is empty of files or a timer ends or a threshold is exceeded
-func (d *Dir) WatchDrain(opt *Options) (bool, error) {
+// watchDrain watches a directory until it is empty of files or a timer ends or a threshold is exceeded
+func (d *dir) watchDrain(opt *options) (bool, error) {
 	ctx := context.Background()
 	draining, cancel := context.WithCancel(ctx)
 	resultCh := make(chan result)
@@ -142,7 +142,7 @@ func (d *Dir) WatchDrain(opt *Options) (bool, error) {
 }
 
 // drainer runs while the target directory is not empty, tracking file deletion and creation events
-func drainer(d *Dir, watcher *fsnotify.Watcher, draining context.Context, resultCh chan<- result, opt *Options) {
+func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, resultCh chan<- result, opt *options) {
 	defer func() {
 		if opt.threshold > 0 {
 			close(opt.eventCh)
@@ -187,7 +187,7 @@ func drainer(d *Dir, watcher *fsnotify.Watcher, draining context.Context, result
 	<-draining.Done()
 }
 
-func timer(ctx, draining context.Context, resultCh chan<- result, opt *Options) {
+func timer(ctx, draining context.Context, resultCh chan<- result, opt *options) {
 	timer, cancelTimer := context.WithTimeout(ctx, opt.timer)
 	defer cancelTimer()
 
@@ -202,7 +202,7 @@ func timer(ctx, draining context.Context, resultCh chan<- result, opt *Options) 
 
 // threshold monitors file creation activity.
 // If file creation is too active and the directory is not going to drain, watchdrain will stop.
-func threshold(draining context.Context, resultCh chan<- result, opt *Options) {
+func threshold(draining context.Context, resultCh chan<- result, opt *options) {
 	// `creates` and `removes` track draining activity
 	creates, removes := 0, 0
 	for {

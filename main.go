@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"time"
-
-	"github.com/mabego/watchdrain"
 )
 
 func main() {
@@ -29,14 +27,14 @@ func main() {
 	switch {
 	case len(flag.Args()) == 1:
 		dir := flag.Arg(0)
-		d, err := watchdrain.NewDir(dir)
+		d, err := newDir(dir)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		opts := watchdrain.NewOptions(*timer, *threshold, *verbose)
-		watch, err := d.WatchDrain(opts)
-		if errors.Is(err, watchdrain.ErrTimerEnded) {
+		opts := newOptions(*timer, *threshold, *verbose)
+		watch, err := d.watchDrain(opts)
+		if errors.Is(err, ErrTimerEnded) {
 			fmt.Fprintf(os.Stderr, "%s: %s after %s\n", dir, err, timer)
 			os.Exit(1)
 		} else if err != nil {
