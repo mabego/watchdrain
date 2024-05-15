@@ -21,32 +21,32 @@ const (
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
-	fmt.Println("Cleaning path...")
-	if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-		fmt.Println(err)
-	}
 
-	fmt.Println("Running test...")
-	result := m.Run()
-	os.Exit(result)
+	fmt.Println("Running tests...")
+	testsResult := m.Run()
+	os.Exit(testsResult)
 }
 
-func createPath(t *testing.T) {
+func createPath(t *testing.T) string {
 	t.Helper()
-	fmt.Println("Creating testing directory...")
-	// Creating testing directory and subdirectory in the default directory for temporary files
-	if err := os.MkdirAll(filepath.Join(os.TempDir(), testDir, sub), 0o700); err != nil {
+	fmt.Println("Creating test directory path...")
+	// Creating a testing directory and subdirectory in the default directory for temporary files
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, testDir, sub), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("%s\n", filepath.Join(os.TempDir(), testDir))
+	tmpDir = filepath.Join(tmpDir, testDir)
+	fmt.Printf("%s\n", tmpDir)
+
+	return tmpDir
 }
 
-func createSeedFiles(t *testing.T) {
+func createSeedFiles(t *testing.T, tmpDir string) {
 	t.Helper()
 	fmt.Println("Creating testing files...")
 	files := []string{file1, file2}
 	for _, file := range files {
-		f, err := os.Create(filepath.Join(os.TempDir(), testDir, file))
+		f, err := os.Create(filepath.Join(tmpDir, file))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,9 +67,9 @@ func createSeedFiles(t *testing.T) {
 	}
 }
 
-func createTempFile(t *testing.T) *os.File {
+func createTempFile(t *testing.T, tmpDir string) *os.File {
 	t.Helper()
-	f, err := os.CreateTemp(filepath.Join(os.TempDir(), testDir), "temp.*.txt")
+	f, err := os.CreateTemp(tmpDir, "temp.*.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,13 +90,13 @@ func createTempFile(t *testing.T) *os.File {
 }
 
 func TestReadDirFiles(t *testing.T) {
-	createPath(t)
+	testPath := createPath(t)
 
 	for i := 0; i < 3; i++ {
-		createTempFile(t)
+		createTempFile(t, testPath)
 	}
 
-	d, err := newDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(testPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,18 +106,12 @@ func TestReadDirFiles(t *testing.T) {
 	if got != want {
 		t.Errorf("Did not get expected result. Wanted: %d, got: %d", want, got)
 	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
-		}
-	})
 }
 
 func TestEmpty(t *testing.T) {
-	createPath(t)
+	testPath := createPath(t)
 
-	d, err := newDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(testPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,20 +121,14 @@ func TestEmpty(t *testing.T) {
 	if got != want {
 		t.Errorf("Did not get expected result. Wanted: %d, got: %d", want, got)
 	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
-		}
-	})
 }
 
 func TestTimer(t *testing.T) {
-	createPath(t)
-	createSeedFiles(t)
+	testPath := createPath(t)
+	createSeedFiles(t, testPath)
 
 	want := ErrTimerEnded
-	d, err := newDir(filepath.Join(os.TempDir(), testDir))
+	d, err := newDir(testPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,22 +138,16 @@ func TestTimer(t *testing.T) {
 			t.Errorf("Unexpected result. Wanted: %s, got: %s", want, got)
 		}
 	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
-		}
-	})
 }
 
 func TestDrainNoCreates(t *testing.T) {
-	createPath(t)
-	createSeedFiles(t)
+	testPath := createPath(t)
+	createSeedFiles(t, testPath)
 
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
-		d, err := newDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(testPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,31 +165,25 @@ func TestDrainNoCreates(t *testing.T) {
 		t.Parallel()
 
 		time.Sleep(50 * time.Millisecond)
-		if err := os.Remove(filepath.Join(os.TempDir(), testDir, file1)); err != nil {
+		if err := os.Remove(filepath.Join(testPath, file1)); err != nil {
 			t.Error(err)
 		}
 
 		time.Sleep(time.Millisecond)
-		if err := os.Remove(filepath.Join(os.TempDir(), testDir, file2)); err != nil {
+		if err := os.Remove(filepath.Join(testPath, file2)); err != nil {
 			t.Error(err)
-		}
-	})
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
 		}
 	})
 }
 
 func TestDrainWithCreates(t *testing.T) {
-	createPath(t)
-	createSeedFiles(t)
+	testPath := createPath(t)
+	createSeedFiles(t, testPath)
 
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
-		d, err := newDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(testPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -225,18 +201,18 @@ func TestDrainWithCreates(t *testing.T) {
 		t.Parallel()
 
 		time.Sleep(50 * time.Millisecond)
-		if err := os.Remove(filepath.Join(os.TempDir(), testDir, file1)); err != nil {
+		if err := os.Remove(filepath.Join(testPath, file1)); err != nil {
 			t.Error(err)
 		}
 
-		f3 := createTempFile(t)
+		f3 := createTempFile(t, testPath)
 
 		time.Sleep(time.Millisecond)
-		if err := os.Remove(filepath.Join(os.TempDir(), testDir, file2)); err != nil {
+		if err := os.Remove(filepath.Join(testPath, file2)); err != nil {
 			t.Error(err)
 		}
 
-		f4 := createTempFile(t)
+		f4 := createTempFile(t, testPath)
 
 		time.Sleep(time.Millisecond)
 		if err := os.Remove(f3.Name()); err != nil {
@@ -247,23 +223,17 @@ func TestDrainWithCreates(t *testing.T) {
 			t.Error(err)
 		}
 	})
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
-		}
-	})
 }
 
 func TestNotDraining(t *testing.T) {
-	createPath(t)
-	createSeedFiles(t)
+	testPath := createPath(t)
+	createSeedFiles(t, testPath)
 
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
 		want := ErrThresholdExceeded
-		d, err := newDir(filepath.Join(os.TempDir(), testDir))
+		d, err := newDir(testPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -279,22 +249,16 @@ func TestNotDraining(t *testing.T) {
 		t.Parallel()
 
 		time.Sleep(50 * time.Millisecond)
-		createTempFile(t)
+		createTempFile(t, testPath)
 
 		time.Sleep(time.Millisecond)
-		if err := os.Remove(filepath.Join(os.TempDir(), testDir, file1)); err != nil {
+		if err := os.Remove(filepath.Join(testPath, file1)); err != nil {
 			t.Error(err)
 		}
 
-		createTempFile(t)
+		createTempFile(t, testPath)
 
 		// Exceed the create-to-remove threshold
-		createTempFile(t)
-	})
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(filepath.Join(os.TempDir(), testDir)); err != nil {
-			t.Fatal(err)
-		}
+		createTempFile(t, testPath)
 	})
 }
