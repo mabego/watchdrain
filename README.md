@@ -25,7 +25,7 @@ go run . <directory>
 ## Usage
 
 ```shell
-watchdrain <directory>
+watchdrain -deadline 1m <directory>
 ```
 
 See `watchdrain --help` for more information.
