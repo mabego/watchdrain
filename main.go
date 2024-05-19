@@ -9,18 +9,18 @@ import (
 )
 
 func main() {
-	timer := flag.Duration("timer", (5 * time.Minute), "Set a timer. Default is 5 minutes.")
-	threshold := flag.Uint("threshold", 0, "Stop watching a directory if file create events exceed "+
-		"remove events by a threshold\nthreshold = create events - remove events\nThe lowest threshold is 1. "+
-		"Increase to allow more create events while watching.")
+	deadline := flag.Duration("deadline", (5 * time.Minute), "Set a time to stop watching a directory "+
+		"draining of files.")
+	eventMonitor := flag.Uint("eventMonitor", 0, "Set a file creation monitor threshold to stop"+
+		" watching a directory when file create events exceed remove events by a threshold:"+
+		"\nthreshold = create events - remove events\n"+
+		"Increase to allow more file creation activity while watching. The lowest threshold is 1.")
 	verbose := flag.Bool("v", false, "Log file create and remove events")
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "watchdrain watches a directory until it is empty of files\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of watchdrain:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "%s <dir>\n", os.Args[0])
+		w := flag.CommandLine.Output()
+		fmt.Fprintf(w, "Usage:\n %s [options] <dir>\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(flag.CommandLine.Output(), "%s -timer 1m -threshold 1 -v <dir>\n", os.Args[0])
 	}
 	flag.Parse()
 
@@ -32,10 +32,10 @@ func main() {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
-		opts := newOptions(*timer, *threshold, *verbose)
+		opts := newOptions(*deadline, *eventMonitor, *verbose)
 		watch, err := d.watchDrain(opts)
-		if errors.Is(err, ErrTimerEnded) {
-			fmt.Fprintf(os.Stderr, "%s: %s after %s\n", dir, err, timer)
+		if errors.Is(err, ErrTimeout) {
+			fmt.Fprintf(os.Stderr, "%s: %s after %s\n", dir, err, deadline)
 			os.Exit(1)
 		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", dir, err)

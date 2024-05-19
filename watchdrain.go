@@ -60,9 +60,9 @@ func (d *dir) isEmpty() bool {
 }
 
 var (
-	// ErrThresholdExceeded is returned when file creation events exceed removal events by a set threshold
-	ErrThresholdExceeded = errors.New("threshold exceeded")
-	ErrTimerEnded        = errors.New("timer ended")
+	// ErrTooManyCreateEvents is returned when file creation events exceed removal events by a set threshold
+	ErrTooManyCreateEvents = errors.New("file creation threshold exceeded")
+	ErrTimeout             = errors.New("deadline exceeded")
 )
 
 // event describes a set of file operation notifications
@@ -76,20 +76,20 @@ const (
 
 // options for watchDrain
 type options struct {
-	eventCh   chan event
-	timer     time.Duration
-	threshold uint
-	verbose   bool
+	eventCh     chan event
+	deadline    time.Duration
+	fileCreates uint
+	verbose     bool
 }
 
-// newOptions returns options, including an eventCh channel if a threshold is set
-func newOptions(timer time.Duration, threshold uint, verbose bool) *options {
+// newOptions returns options, including an eventCh channel if a fileCreationMonitor is set
+func newOptions(deadline time.Duration, fileCreates uint, verbose bool) *options {
 	opts := &options{
-		timer:     timer,
-		threshold: threshold,
-		verbose:   verbose,
+		deadline:    deadline,
+		fileCreates: fileCreates,
+		verbose:     verbose,
 	}
-	if threshold > 0 {
+	if fileCreates > 0 {
 		opts.eventCh = make(chan event)
 	}
 	return opts
@@ -101,7 +101,7 @@ type result struct {
 	drained bool
 }
 
-// watchDrain watches a directory until it is empty of files or a timer ends or a threshold is exceeded
+// watchDrain watches a directory until it is empty of files or a deadline ends or a file creation threshold is exceeded
 func (d *dir) watchDrain(opt *options) (bool, error) {
 	ctx := context.Background()
 	draining, cancel := context.WithCancel(ctx)
@@ -126,12 +126,12 @@ func (d *dir) watchDrain(opt *options) (bool, error) {
 	// Start watching the directory drain
 	go drainer(d, watcher, draining, resultCh, opt)
 
-	// Start the timer and/or monitoring threshold
-	if opt.timer > 0 {
-		go timer(ctx, draining, resultCh, opt)
+	// Start the deadlineTimer and/or fileCreationMonitor
+	if opt.deadline > 0 {
+		go deadlineTimer(ctx, draining, resultCh, opt)
 	}
-	if opt.threshold > 0 {
-		go threshold(draining, resultCh, opt)
+	if opt.fileCreates > 0 {
+		go fileCreationMonitor(draining, resultCh, opt)
 	}
 
 	res := <-resultCh
@@ -144,7 +144,7 @@ func (d *dir) watchDrain(opt *options) (bool, error) {
 // drainer runs while the target directory is not empty, tracking file deletion and creation events
 func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, resultCh chan<- result, opt *options) {
 	defer func() {
-		if opt.threshold > 0 {
+		if opt.fileCreates > 0 {
 			close(opt.eventCh)
 		}
 	}()
@@ -161,7 +161,7 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 				d.mu.Lock()
 				*d.files--
 				d.mu.Unlock()
-				if opt.threshold > 0 {
+				if opt.fileCreates > 0 {
 					opt.eventCh <- Remove
 				}
 			}
@@ -172,7 +172,7 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 				d.mu.Lock()
 				*d.files++
 				d.mu.Unlock()
-				if opt.threshold > 0 {
+				if opt.fileCreates > 0 {
 					opt.eventCh <- Create
 				}
 			}
@@ -187,22 +187,22 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 	<-draining.Done()
 }
 
-func timer(ctx, draining context.Context, resultCh chan<- result, opt *options) {
-	timerCtx, cancelTimer := context.WithTimeout(ctx, opt.timer)
-	defer cancelTimer()
+func deadlineTimer(ctx, draining context.Context, resultCh chan<- result, opt *options) {
+	deadlineCtx, cancel := context.WithTimeout(ctx, opt.deadline)
+	defer cancel()
 
 	select {
-	case <-timerCtx.Done():
-		resultCh <- result{err: ErrTimerEnded}
+	case <-deadlineCtx.Done():
+		resultCh <- result{err: ErrTimeout}
 		<-draining.Done()
 	case <-draining.Done():
 		return
 	}
 }
 
-// threshold monitors file creation activity.
+// fileCreationMonitor monitors file creation activity.
 // If file creation is too active and the directory is not going to drain, watchdrain will stop.
-func threshold(draining context.Context, resultCh chan<- result, opt *options) {
+func fileCreationMonitor(draining context.Context, resultCh chan<- result, opt *options) {
 	// `creates` and `removes` track draining activity
 	creates, removes := 0, 0
 	for {
@@ -217,8 +217,8 @@ func threshold(draining context.Context, resultCh chan<- result, opt *options) {
 				creates++
 			}
 		}
-		if creates-removes > int(opt.threshold) { // 1 is the lowest threshold
-			resultCh <- result{err: ErrThresholdExceeded}
+		if creates-removes > int(opt.fileCreates) { // 1 is the lowest fileCreates
+			resultCh <- result{err: ErrTooManyCreateEvents}
 			<-draining.Done()
 			return
 		}

@@ -123,11 +123,11 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
-func TestTimer(t *testing.T) {
+func TestDeadline(t *testing.T) {
 	testPath := createPath(t)
 	createSeedFiles(t, testPath)
 
-	want := ErrTimerEnded
+	want := ErrTimeout
 	d, err := newDir(testPath)
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +232,7 @@ func TestNotDraining(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 
-		want := ErrThresholdExceeded
+		want := ErrTooManyCreateEvents
 		d, err := newDir(testPath)
 		if err != nil {
 			t.Fatal(err)
