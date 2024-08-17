@@ -124,11 +124,11 @@ func (d *dir) watchDrain(opt *options) (bool, error) {
 	}()
 
 	// Start watching the directory drain
-	go drainer(d, watcher, draining, resultCh, opt)
+	go drainer(draining, d, watcher, resultCh, opt)
 
 	// Start the deadlineTimer and/or fileCreationMonitor
 	if opt.deadline > 0 {
-		go deadlineTimer(ctx, draining, resultCh, opt)
+		go deadlineTimer(draining, resultCh, opt)
 	}
 	if opt.fileCreates > 0 {
 		go fileCreationMonitor(draining, resultCh, opt)
@@ -142,7 +142,7 @@ func (d *dir) watchDrain(opt *options) (bool, error) {
 }
 
 // drainer runs while the target directory is not empty, tracking file deletion and creation events
-func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, resultCh chan<- result, opt *options) {
+func drainer(draining context.Context, d *dir, watcher *fsnotify.Watcher, resultCh chan<- result, opt *options) {
 	defer func() {
 		if opt.fileCreates > 0 {
 			close(opt.eventCh)
@@ -187,8 +187,8 @@ func drainer(d *dir, watcher *fsnotify.Watcher, draining context.Context, result
 	<-draining.Done()
 }
 
-func deadlineTimer(ctx, draining context.Context, resultCh chan<- result, opt *options) {
-	deadlineCtx, cancel := context.WithTimeout(ctx, opt.deadline)
+func deadlineTimer(draining context.Context, resultCh chan<- result, opt *options) {
+	deadlineCtx, cancel := context.WithTimeout(draining, opt.deadline)
 	defer cancel()
 
 	select {
